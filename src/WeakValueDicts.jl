@@ -26,7 +26,7 @@ mutable struct WeakValueDict{K,V} <: AbstractDict{K,V}
             if islocked(wvd)
                 # If locked, we add another finalizer and defer the deletion
                 # until the new finalizer is invoked.
-                finalizer(wvd.finalizer, k)
+                finalizer((v) -> wvd.finalizer(k, v), v)
                 return nothing
             end
             delete!(wvd, k)
@@ -86,7 +86,6 @@ end
 
 Base.islocked(wvd::WeakValueDict) = islocked(wvd.lock)
 Base.lock(f, wvd::WeakValueDict) = lock(f, wvd.lock)
-Base.trylock(f, wvd::WeakValueDict) = trylock(f, wvd.lock)
 
 function Base.getindex(wvd::WeakValueDict{K, V}, key::K)::V where {K, V}
     return lock(wvd) do
@@ -110,12 +109,16 @@ function Base.getkey(wvd::WeakValueDict{K}, kk, default) where {K}
     end
 end
 
-function map!(f, iter::ValueIterator{<:WeakValueDict})
-    dict = iter.dict
+function Base.map!(f, iter::ValueIterator{<:WeakValueDict})
+    dict = iter.dict.ht
+
+    # This code is adapted from the implementation of `map!` for WeakKeyDict.
+    # Here be `Dict` internals and violations of encapsulation.
+    # Beware all ye who enter here.
     vals = dict.vals
     # @inbounds is here so the it gets propigated to isslotfiled
     @inbounds for i = dict.idxfloor:lastindex(vals)
-        if isslotfilled(dict, i)
+        if Base.isslotfilled(dict, i)
             # Hold an explicit reference here so that we avoid race conditions
             # where the GC can trigger between checking if the value is
             # `nothing` and actually mapping it.

@@ -130,4 +130,33 @@ end
             @test v.v == k
         end
     end
+
+    @testset "finalizer deferal" begin
+        wvd = WeakValueDict()
+        for i in 1:1000
+            wvd[i] = V(i)
+        end
+        lock(wvd) do
+            @test islocked(wvd)
+            @test islocked(wvd.lock)
+
+            l = length(wvd)
+            @test l > 0
+
+            # This GC should invoke the finalizer for some of the values in the
+            # WeakValueDict, but since its locked, it will "defer" the finalizer
+            # until later (at which point the WVD should be unlocked).
+            Base.GC.gc(true)
+
+            # We shouldn't delete any keys while locked because none of the
+            # finalizers should have executed in the "normal" (unlocked) path.
+            @test length(wvd) == l
+        end
+
+        # This should invoke the finalizers for all the entries in the dict.
+        # The finalizers *should* be the finalizers that were scheduled later
+        # and the GC'd values should have their entries in the dict cleared.
+        Base.GC.gc(true)
+        @test length(wvd) < 1000
+    end
 end
