@@ -67,7 +67,7 @@ function WeakValueDict(kv)
     try
         Base.dict_with_eltype((K, V) -> WeakValueDict{K,V}, kv, eltype(kv))
     catch
-        if !isiterable(typeof(kv)) || !all(x -> isa(x, Union{Tuple,Pair}), kv)
+        if !Base.isiterable(typeof(kv)) || !all(x -> isa(x, Union{Tuple,Pair}), kv)
             throw(ArgumentError(
                 "WeakValueDict(kv): " *
                     "kv needs to be an iterator of tuples or pairs",

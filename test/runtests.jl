@@ -45,6 +45,8 @@ end
         wvd["bar"] = V("bar")
         @test empty!(wvd) == empty(wvd)
         @test isempty(wvd)
+
+        @test WeakValueDict{String, V}() == empty(WeakValueDict(), String, V)
     end
 
     @testset "Finalization" begin
@@ -94,6 +96,15 @@ end
 
         wvd = WeakValueDict(Dict("foo" => "bar"))
         @test typeof(wvd) === WeakValueDict{String, String}
+
+        bar = V("bar")
+        wvd = WeakValueDict([("foo", bar), ("spam", bar)])
+        @test typeof(wvd) === WeakValueDict{String, V}
+        @test wvd["foo"] === bar
+
+        @test_throws ArgumentError WeakValueDict("foo")
+        @test_throws ArgumentError WeakValueDict(123)
+        @test_throws MethodError WeakValueDict("foo", "bar", "spam", "eggs")
     end
 
     @testset "map! and filter!" begin
