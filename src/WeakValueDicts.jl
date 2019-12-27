@@ -18,10 +18,7 @@ mutable struct WeakValueDict{K,V} <: AbstractDict{K,V}
     finalizer
 
     # Constructors mirror Dict's
-    function WeakValueDict{K,V}() where {K,V}
-        if isimmutable(V)
-            error("WeakValueDict cannot be used with immutable values.")
-        end
+    function WeakValueDict{K,V}() where {V} where {K}
         wvd = new(Dict{Any,V}(), ReentrantLock())
         wvd.finalizer = function (k, v)
             # When a weak value is finalized, remove from dictionary if it is
@@ -38,7 +35,14 @@ mutable struct WeakValueDict{K,V} <: AbstractDict{K,V}
     end
 end
 
-function WeakValueDict{K,V}(kv) where {K,V}
+WeakValueDict() = WeakValueDict{Any,Any}()
+WeakValueDict(kv::Tuple{}) = WeakValueDict()
+WeakValueDict(ps::Pair{K,V}...) where {K,V} = WeakValueDict{K,V}(ps)
+WeakValueDict(ps::Pair{K}...) where {K} = WeakValueDict{K,Any}(ps)
+WeakValueDict(ps::(Pair{K,V} where {K})...) where {V} = WeakValueDict{Any,V}(ps)
+WeakValueDict(ps::Pair...) = WeakValueDict{Any,Any}(ps)
+
+function WeakValueDict{K,V}(kv) where {V} where {K}
     h = WeakValueDict{K,V}()
     for (k, v) in kv
         h[k] = v
@@ -46,11 +50,11 @@ function WeakValueDict{K,V}(kv) where {K,V}
     return h
 end
 
-function WeakValueDict{K,V}(p::Pair) where {K,V}
+function WeakValueDict{K,V}(p::Pair) where {V} where {K}
     setindex!(WeakValueDict{K,V}(), p.second, p.first)
 end
 
-function WeakValueDict{K,V}(ps::Pair...) where {K,V}
+function WeakValueDict{K,V}(ps::Pair...) where {V} where {K}
     h = WeakValueDict{K,V}()
     sizehint!(h, length(ps))
     for p in ps
@@ -58,15 +62,6 @@ function WeakValueDict{K,V}(ps::Pair...) where {K,V}
     end
     return h
 end
-WeakValueDict() = WeakValueDict{Any,Any}()
-
-WeakValueDict(kv::Tuple{}) = WeakValueDict()
-Base.copy(d::WeakValueDict) = WeakValueDict(d)
-
-WeakValueDict(ps::Pair{K,V}...) where {K,V} = WeakValueDict{K,V}(ps)
-WeakValueDict(ps::Pair{K}...) where {K} = WeakValueDict{K,Any}(ps)
-WeakValueDict(ps::(Pair{K,V} where {K})...) where {V} = WeakValueDict{Any,V}(ps)
-WeakValueDict(ps::Pair...) = WeakValueDict{Any,Any}(ps)
 
 function WeakValueDict(kv)
     try
@@ -82,6 +77,8 @@ function WeakValueDict(kv)
         end
     end
 end
+
+Base.copy(d::WeakValueDict) = WeakValueDict(d)
 
 function Base.empty(d::WeakValueDict, ::Type{K}, ::Type{V}) where {K,V}
     return WeakValueDict{K,V}()
@@ -192,6 +189,7 @@ Base.haskey(wvd::WeakValueDict{K}, key) where {K} =
 
 Base.isempty(wvd::WeakValueDict) = isempty(wvd.ht)
 Base.length(t::WeakValueDict) = length(t.ht)
+Base.sizehint!(wvd::WeakValueDict, newsz) = sizehint!(wvd.ht, newsz)
 
 function Base.iterate(t::WeakValueDict{K,V}, state...) where {K,V}
     y = lock(() -> iterate(t.ht, state...), t)
@@ -202,6 +200,6 @@ function Base.iterate(t::WeakValueDict{K,V}, state...) where {K,V}
     return (kv, newstate)
 end
 
-Base.filter!(f, d::WeakValueDict) = filter_in_one_pass!(f, d)
+Base.filter!(f, d::WeakValueDict) = Base.filter_in_one_pass!(f, d)
 
 end # module
