@@ -24,12 +24,14 @@ end
         @test !haskey(wvd, "foo")
         @test_throws KeyError pop!(wvd, "foo")
         @test_throws KeyError wvd["foo"]
-        @test delete!(wvd, "foo") === nothing
+        @test delete!(wvd, "foo") === wvd
 
         @test get!(wvd, "foo", foo) === foo
         @test wvd["foo"] === foo
-        @test delete!(wvd, "foo") === nothing
+        @test delete!(wvd, "foo") === wvd
         @test !haskey(wvd, "foo")
+
+        @test delete!(wvd, "bar") == empty(wvd)
     end
 
     @testset "Finalization" begin
